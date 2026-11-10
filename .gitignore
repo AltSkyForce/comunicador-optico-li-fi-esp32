@@ -1,0 +1,10 @@
+# Arquivos temporários e locais
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+.vscode/
+.idea/
+**/build/
+**/.arduinoIDE-unsaved*/
