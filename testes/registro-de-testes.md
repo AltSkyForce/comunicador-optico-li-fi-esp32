@@ -1,36 +1,76 @@
-# Registro de testes — 10/11/2026
+# Registro experimental — Comunicador óptico Li-Fi
 
-> Valores transcritos de capturas do Monitor Serial do experimento.
-> São leituras ADC de 12 bits (0–4095), não medições de lux.
+As leituras são valores ADC de 12 bits (0–4095), **não valores de iluminância em lux**. Os resultados abaixo vêm dos testes e capturas do Monitor Serial apresentados durante a montagem.
 
-| Etapa | Condição | Observação | Resultado |
-| --- | --- | --- | --- |
-| 1 | Upload ESP32 Dev Module via COM5 | Gravação verificada e mensagens a 115200 baud | Aprovado |
-| 2 | LED alto brilho no GPIO23 | Pisca alternando ligado/desligado | Aprovado |
-| 3 | LDR no GPIO34, luz ambiente | Aproximadamente 2060 | Aprovado |
-| 3 | LDR coberto com a mão | 0 a 48 | Aprovado |
-| 3 | LDR iluminado com lanterna do celular | Próximo de 4095 (saturação da leitura) | Aprovado |
-| 4 | LED e LDR alinhados sem tubo | Ligado ~3270 / desligado ~1900 | Aprovado |
-| 5 | LED e LDR alinhados com tubo | Desligado 0 / ligado tipicamente ~2850–2915 | Aprovado |
-| 6 | Sequência binária `10110` com tubo | Enviado = recebido em várias repetições observadas, limiar 1500 | Aprovado no teste observado |
-| 7 | Texto completo (bytes, palavras) | Ainda não executado | Pendente |
-| 8 | Buzzer passivo | Disponível; ligação e especificações ainda não verificadas | Pendente |
+## Transmissão e recepção iniciais — 10/11/2026
 
-## Interpretação
+| Etapa | Observação |
+|---|---|
+| ESP32 programado via Arduino IDE | Gravação e comunicação serial aprovadas |
+| LED de alto brilho no GPIO23 | Pisca de acordo com o código |
+| LDR no GPIO34 | Coberto: 0–48; ambiente: ~2060; lanterna: até 4095 |
+| LED/LDR sem tubo | LED ligado ~3270; apagado ~1900 |
+| LED/LDR com tubo | LED ligado tipicamente ~2850–2915; apagado 0 |
+| Bits `10110` | Recepção correta nas repetições observadas |
+| Palavra `OLA` | Recuperada por leituras do LDR |
+| Mensagens personalizadas | `Guilherme` e `ola mundo` recuperadas |
 
-O tubo reduz a interferência luminosa ambiental: o LED apagado passou de aproximadamente 1900 para 0.
-A amplitude de leitura **não aumentou necessariamente**: o LED ligado ficou tipicamente em ~2850–2915,
-abaixo de ~3270 sem tubo. O principal ganho observado foi o contraste e o isolamento do sinal.
+### Problema identificado: alumínio perto das conexões
 
-O limiar de 1500 funcionou para a montagem específica com o tubo. Ele não é universal: deve ser
-recalibrado se a posição, o LED, o LDR ou a iluminação mudarem.
+Foi colocado papel-alumínio em volta do tubo, e houve leituras elevadas mesmo com o LED apagado. Após a retirada do alumínio, o sistema voltou a funcionar normalmente. O contato elétrico com o material condutor foi a causa **suspeita, compatível com o comportamento observado**, mas não medida com instrumento. Evitar materiais condutores em contato com fios e terminais.
 
-A sequência `10110` foi produzida e amostrada pelo **mesmo ESP32**, que controla os instantes
-de leitura; trata-se de um teste de loopback óptico, não de dois dispositivos independentes.
+## Velocidade — 11/11/2026
 
-## Próximos testes
+Mensagem de teste: `ola mundo` = 9 caracteres = 72 bits de dados.
 
-- Transmitir e reconstruir caracteres a partir de leituras do LDR.
-- Testar diferentes alinhamentos, iluminação e velocidades.
-- Registrar fotos e repetir medições para obter uma taxa de erro quantitativa.
-- Adicionar buzzer passivo somente após conferir tensão, corrente e tipo do transdutor.
+| Duração do bit | Taxa bruta teórica | Duração apenas dos 72 bits | Resultado informado |
+|---|---:|---:|---|
+| 1000 ms | 1 bit/s | 72,0 s | Funcionou inicialmente |
+| 700 ms | ~1,43 bit/s | 50,4 s | Sucesso |
+| 500 ms | 2 bit/s | 36,0 s | Sucesso |
+| 300 ms | ~3,33 bit/s | 21,6 s | Sucesso |
+
+Os tempos não incluem overhead nem CRC. **Não se determinou a velocidade máxima física do receptor.** Também não há ensaio estatístico de taxa de erro para todas as velocidades.
+
+## Verificação CRC-8 — 11/11/2026
+
+Parâmetros: polinômio `0x07`, valor inicial `0x00`, sem reflexão, XOR final `0x00`. Mensagem `ola mundo`, sem acentos.
+
+### Ensaio sem obstáculo
+
+```text
+Mensagem enviada: ola mundo
+Mensagem recebida: ola mundo
+CRC original: 0xBE
+CRC recebido pela luz: 0xBE
+CRC calculado no receptor: 0xBE
+CRC OK: integridade aprovada!
+Texto recebido corretamente!
+```
+
+### Ensaio com obstrução temporária da luz
+
+```text
+Mensagem enviada: ola mundo
+Mensagem recebida: [texto alterado]
+CRC original: 0xBE
+CRC recebido pela luz: 0xBE
+CRC calculado no receptor: 0x84
+CRC ERRO: dados possivelmente corrompidos!
+Texto recebido diferente do enviado!
+```
+
+A obstrução interrompeu parte da informação óptica, corrompendo a mensagem; o CRC-8 **detectou esse erro observado**.
+
+### Limitações metodológicas
+
+- O sistema é um loopback sincronizado **no mesmo ESP32**: a leitura do LDR ocorre nos instantes controlados pelo transmissor.
+- O CRC é enviado como um byte adicional pelo LED e lido pelo LDR, mas comprimento e sincronismo são conhecidos localmente.
+- CRC-8 detecta muitos, mas não todos, os possíveis erros; pode haver colisões.
+- O teste com obstrução mostra **detecção**, não **correção** nem retransmissão.
+
+## Experimentos recomendados
+
+- Fazer 10 ou mais repetições por velocidade e medir a proporção de mensagens corretas.
+- Testar desalinhamento, diferentes distâncias, luz ambiente e tubo.
+- Fotografar a montagem final e registrar condições/medidas.

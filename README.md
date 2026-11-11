@@ -1,91 +1,80 @@
 # Comunicador Óptico de Dados — Li-Fi de Baixo Custo
 
-> Projeto didático em desenvolvimento: transmissão de texto por luz visível com **um ESP32, um LED e um fotorresistor (LDR)**.
+> Protótipo educacional que transmite mensagens por pulsos luminosos entre um LED e um fotorresistor (LDR), usando **um ESP32**.
 
-**Estado:** ✅ LED, LDR e transmissão óptica de bits validados em bancada; transmissão de texto ainda pendente.  
+**Situação (11/11/2026): protótipo funcional em bancada, com recepção de texto e detecção de erros por CRC-8 demonstradas.**  
 **Apresentação prevista:** 18/11/2026.
 
-## Objetivo
+## Demonstração
 
-Enviar uma mensagem de texto por pulsos luminosos: o ESP32 transforma cada byte em bits, controla um LED, mede a luz recebida pelo LDR e reconstrói os bytes a partir das leituras do sensor. É uma demonstração educacional de comunicação óptica de baixa velocidade, inspirada no conceito de Li-Fi; **não é uma implementação de rede Li-Fi padronizada**.
-
-## Arquitetura atual: um ESP32
+O usuário digita uma mensagem no Monitor Serial do Arduino IDE. O ESP32 converte cada byte em bits, aciona o LED (1 = aceso; 0 = apagado), mede a luminosidade pelo LDR e reconstrói o texto. Depois transmite mais um byte de **CRC-8** pelo mesmo canal luminoso para verificar a integridade dos dados recebidos.
 
 ```mermaid
 flowchart TD
-    PC[Computador / Monitor Serial] -->|Mensagem por USB| ESP[ESP32]
-    ESP -->|GPIO 23| LED[LED + resistor]
-    LED -->|Pulsos de luz no ar| LDR[LDR + divisor de tensão]
-    LDR -->|Leitura analógica GPIO 34| ESP
-    ESP -->|Texto reconstruído por USB| PC
+    PC["Monitor Serial: texto digitado"] --> ESP["ESP32 (transmissão e amostragem)"]
+    ESP --> LED["GPIO23 → resistor → LED"]
+    LED -->|"Pulsos de luz no tubo de papelão"| LDR["LDR → divisor resistivo → GPIO34"]
+    LDR --> ESP
+    ESP --> RESULTADO["Texto reconstruído + verificação CRC-8 no Monitor Serial"]
 ```
 
-**Importante:** transmissor e receptor compartilham o mesmo ESP32, que conhece os instantes de envio. É um **laço óptico local (loopback)**, não uma comunicação entre dois dispositivos independentes. O programa **não copia** a mensagem original para a saída recebida: ele reconstrói o texto a partir das medições no LDR. Uma versão futura pode usar dois microcontroladores para transmitir sem sincronização interna.
+**Limite da arquitetura:** esta montagem é um **loopback óptico sincronizado**. O mesmo ESP32 controla a saída luminosa e os instantes de leitura do LDR, e conhece previamente o tamanho da mensagem. Não é uma rede Li-Fi padronizada e não é um enlace assíncrono entre dois equipamentos independentes. O texto recebido, entretanto, é reconstruído a partir da **leitura real da luz**, não copiado da mensagem original.
 
-## Componentes
+## Montagem
 
-- 1 ESP32 DevKit de 38 pinos (placa preta fotografada; conferir pinagem na própria placa)
-- 1 LED visível, preferencialmente de alto brilho
-- 1 LDR (fotorresistor)
-- 1 resistor de **220 Ω ou 330 Ω** para o LED
-- 1 resistor de **10 kΩ** para o divisor do LDR
-- 1 ou 2 protoboards, fios jumper, cabo USB de **dados** e notebook
-- Tubo de papelão utilizado e validado para reduzir a luz ambiente
+- ESP32 DevKit, LED de alto brilho de 5 mm, LDR, 2 protoboards, fios e tubo de papelão.
+- LED: **GPIO23 → resistor limitador (220–330 Ω) → ânodo do LED; cátodo → GND**.
+- LDR: **3V3 → LDR → nó de medição GPIO34 → resistor de 10 kΩ → GND**.
+- Mapeamento de furos das duas protoboards: [hardware/mapeamento-atual.md](hardware/mapeamento-atual.md), caso tenha aplicado a atualização anterior.
+- Confira os valores reais dos resistores antes de energizar. **Nunca conecte 5 V diretamente ao GPIO34**.
+- Use papelão ou revestimento **não condutor** para bloquear luz lateral. Papel-alumínio encostou nos terminais numa tentativa anterior e causou leituras anormais; após removê-lo, o circuito voltou a funcionar.
 
-**Atenção:** os valores dos resistores fotografados ainda precisam ser confirmados pelas faixas/multímetro. Um módulo conversor USB-serial vermelho que aparece nas fotos **não é outro ESP32** e não é necessário nesta montagem.
+## Executar a versão com CRC-8
 
-## Como começar
+1. Instale o Arduino IDE e o pacote `esp32 by Espressif Systems`.
+2. Conecte o ESP32 por USB; selecione **ESP32 Dev Module** e a porta correta.
+3. Abra [firmware/05_comunicador_crc8/05_comunicador_crc8.ino](firmware/05_comunicador_crc8/05_comunicador_crc8.ino).
+4. Envie o programa e abra o **Monitor Serial a 115200 baud** com final de linha **Nova linha**.
+5. Digite `ola mundo` (sem acentos) e pressione Enter.
+6. Observe o texto reconstruído, o CRC transmitido, o CRC recebido e o CRC recalculado.
 
-1. Instale [Arduino IDE](https://www.arduino.cc/en/software) e adicione o pacote **esp32 by Espressif Systems**.
-2. Escolha a placa **ESP32 Dev Module** (ponto de partida) e a porta correspondente ao ESP32.
-3. Veja [hardware/ligacoes.md](hardware/ligacoes.md) antes de energizar o circuito.
-4. Teste `firmware/01_teste_led/01_teste_led.ino`.
-5. Teste `firmware/02_teste_ldr/02_teste_ldr.ino`.
-6. Execute `firmware/03_comunicador_optico/03_comunicador_optico.ino` e envie uma frase pelo Monitor Serial.
-7. Anote resultados e ajustes em [testes/registro-de-testes.md](testes/registro-de-testes.md).
+O código usa **300 ms por bit** (~3,33 bit/s brutos) e limiar ADC **1500**, valores observados como funcionais nesta montagem com tubo. Recalibre o limiar se a iluminação ou o alinhamento mudarem.
 
-> Os testes de LED, LDR e bits foram executados em bancada em 10/11/2026. O código de comunicação de texto incluído é uma proposta inicial **ainda não validada no hardware**.
+## Resultados registrados
 
-## Organização dos arquivos
+| Experimento | Resultado observado |
+|---|---|
+| LED/LDR sem tubo | ~3270 aceso; ~1900 apagado |
+| LED/LDR com tubo | ~2850–2915 aceso; 0 apagado, em medições típicas |
+| Sequência `10110` | Bits recuperados corretamente |
+| Mensagens personalizadas | Texto reconstruído corretamente em ensaios mostrados |
+| Intervalos de 700, 500 e 300 ms/bit | Sucesso relatado com `ola mundo` em cada intervalo |
+| Texto `ola mundo`, CRC-8, sem obstáculo | Original, recebido e recalculado: **0xBE** |
+| Mesmo texto, obstáculo no feixe | CRC recebido **0xBE**, recalculado **0x84**; erro sinalizado |
 
-```text
-comunicador-optico-li-fi-esp32/
-├── README.md
-├── .gitignore
-├── firmware/
-│   ├── 01_teste_led/
-│   ├── 02_teste_ldr/
-│   └── 03_comunicador_optico/
-├── hardware/
-│   ├── componentes.md
-│   └── ligacoes.md
-├── docs/
-│   ├── fundamentos.md
-│   ├── instalacao-arduino-ide.md
-│   └── roteiro-apresentacao.md
-├── testes/
-│   └── registro-de-testes.md
-├── imagens/
-│   └── README.md
-└── apresentacao/
-    └── README.md
-```
+Detalhes e ressalvas em [testes/registro-de-testes.md](testes/registro-de-testes.md).
 
-## Como funciona a codificação
+## Limitações e próximos passos
 
-Cada caractere é transmitido como oito bits. Por exemplo, `A` em ASCII equivale a `01000001`. LED aceso representa 1; LED apagado, 0. O código integrado faz uma calibração e lê o LDR durante cada intervalo de bit. Começamos com intervalos longos porque o LDR é lento em comparação com sensores ópticos próprios para dados.
+- A taxa de 300 ms/bit foi validada nos testes relatados, **não** é uma velocidade máxima comprovada.
+- CRC-8 detecta diversos erros acidentais, mas não todos; **não corrige** os dados.
+- O programa também compara texto enviado/recebido **somente como diagnóstico local**, aproveitando o loopback.
+- O quadro é educativo, de baixa taxa de bits, não um sistema Li-Fi de rede.
+- A adição de buzzer passivo foi **adiada** porque faltam especificações elétricas e circuito de acionamento validado.
+- Futuras melhorias: sincronismo independente, mais testes quantitativos, documentação fotográfica e aprimoramento do protocolo.
 
-## Resultados
+## Estrutura principal
 
-**Resultados parciais medidos em 10/11/2026:** LED ligado ~3270 e desligado ~1900 sem tubo; com tubo, ligado tipicamente ~2850–2915 e desligado 0. A sequência binária `10110` foi recebida corretamente em várias repetições. Veja [registro de testes](testes/registro-de-testes.md). **A transmissão de frases completas ainda não foi comprovada.**
+- `firmware/01_teste_led/`: verificação inicial do LED
+- `firmware/02_teste_ldr/`: verificação inicial do LDR
+- `firmware/03_comunicador_optico/`: protótipo anterior, experimental
+- `firmware/04_teste_bits_tubo/`: teste binário, se incluído na atualização anterior
+- `firmware/05_comunicador_crc8/`: **versão atual recomendada**
+- `hardware/`: componentes, ligações e mapa das protoboards
+- `testes/`: registros experimentais
+- `docs/`: explicações e evolução
+- `imagens/` e `apresentacao/`: materiais a completar
 
-## Próximas melhorias
+## Créditos
 
-- Manter o isolamento com tubo de papelão e documentar fotos.
-- Medir a taxa de erros e ajustar duração dos bits.
-- Avaliar buzzer passivo como feedback sonoro após identificar suas especificações elétricas.
-- Implementar sincronização independente e um segundo microcontrolador (opcional).
-
-## Autoria e licença
-
-Preencher nome(s), escola/curso e orientador antes de publicar. **Nenhuma licença foi escolhida neste pacote**; consulte `docs/licenca-e-creditos.md`.
+Projeto desenvolvido para apresentação escolar em 18/11/2026. Preencha autores, turma, instituição e orientador. Licença ainda não definida.
