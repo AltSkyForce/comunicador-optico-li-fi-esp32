@@ -2,7 +2,7 @@
 
 > Projeto didático em desenvolvimento: transmissão de texto por luz visível com **um ESP32, um LED e um fotorresistor (LDR)**.
 
-**Estado:** 🧪 protótipo ainda não validado em bancada.  
+**Estado:** ✅ LED, LDR e transmissão óptica de bits validados em bancada; transmissão de texto ainda pendente.  
 **Apresentação prevista:** 18/11/2026.
 
 ## Objetivo
@@ -30,7 +30,7 @@ flowchart TD
 - 1 resistor de **220 Ω ou 330 Ω** para o LED
 - 1 resistor de **10 kΩ** para o divisor do LDR
 - 1 ou 2 protoboards, fios jumper, cabo USB de **dados** e notebook
-- Opcional: tubo de papelão para bloquear a luz ambiente
+- Tubo de papelão utilizado e validado para reduzir a luz ambiente
 
 **Atenção:** os valores dos resistores fotografados ainda precisam ser confirmados pelas faixas/multímetro. Um módulo conversor USB-serial vermelho que aparece nas fotos **não é outro ESP32** e não é necessário nesta montagem.
 
@@ -44,7 +44,7 @@ flowchart TD
 6. Execute `firmware/03_comunicador_optico/03_comunicador_optico.ino` e envie uma frase pelo Monitor Serial.
 7. Anote resultados e ajustes em [testes/registro-de-testes.md](testes/registro-de-testes.md).
 
-> Os programas são **códigos iniciais para teste**, ainda não executados no hardware real. O experimento final depende da posição do LED, da iluminação ambiente, do valor do resistor e da calibração.
+> Os testes de LED, LDR e bits foram executados em bancada em 10/11/2026. O código de comunicação de texto incluído é uma proposta inicial **ainda não validada no hardware**.
 
 ## Organização dos arquivos
 
@@ -77,12 +77,13 @@ Cada caractere é transmitido como oito bits. Por exemplo, `A` em ASCII equivale
 
 ## Resultados
 
-**Ainda não coletados.** Quando a montagem funcionar, adicionar fotos, exemplos de mensagens, taxas de acerto e limitações. Nunca substituir resultados medidos por resultados imaginados.
+**Resultados parciais medidos em 10/11/2026:** LED ligado ~3270 e desligado ~1900 sem tubo; com tubo, ligado tipicamente ~2850–2915 e desligado 0. A sequência binária `10110` foi recebida corretamente em várias repetições. Veja [registro de testes](testes/registro-de-testes.md). **A transmissão de frases completas ainda não foi comprovada.**
 
 ## Próximas melhorias
 
-- Reforçar o isolamento da luz ambiente com tubo de papelão.
+- Manter o isolamento com tubo de papelão e documentar fotos.
 - Medir a taxa de erros e ajustar duração dos bits.
+- Avaliar buzzer passivo como feedback sonoro após identificar suas especificações elétricas.
 - Implementar sincronização independente e um segundo microcontrolador (opcional).
 
 ## Autoria e licença
